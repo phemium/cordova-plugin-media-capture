@@ -59,7 +59,7 @@ import android.media.MediaPlayer;
 import android.net.Uri;
 import android.os.Environment;
 import android.provider.MediaStore;
-import android.support.v4.content.FileProvider;
+import androidx.core.content.FileProvider;
 import org.apache.cordova.BuildHelper;
 
 public class Capture extends CordovaPlugin {
@@ -90,6 +90,24 @@ public class Capture extends CordovaPlugin {
     private String audioAbsolutePath;
     private String imageAbsolutePath;
     private String videoAbsolutePath;
+
+    private static String[] permissions;
+    static {
+        if (android.os.Build.VERSION.SDK_INT >= Build.VERSION_CODES.TIRAMISU) {
+            permissions = new String[] {
+                    Manifest.permission.READ_MEDIA_AUDIO,
+                    Manifest.permission.READ_MEDIA_VIDEO,
+                    Manifest.permission.READ_MEDIA_IMAGES,
+                    Manifest.permission.CAMERA,
+            };
+        } else {
+            permissions = new String[] {
+                    Manifest.permission.READ_EXTERNAL_STORAGE,
+                    Manifest.permission.WRITE_EXTERNAL_STORAGE,
+                    Manifest.permission.CAMERA
+            };
+        }
+    }
 
     private String applicationId;
 
@@ -240,9 +258,15 @@ public class Capture extends CordovaPlugin {
      * Sets up an intent to capture audio.  Result handled by onActivityResult()
      */
     private void captureAudio(Request req) {
-      if (!PermissionHelper.hasPermission(this, Manifest.permission.READ_EXTERNAL_STORAGE)) {
-          PermissionHelper.requestPermission(this, req.requestCode, Manifest.permission.READ_EXTERNAL_STORAGE);
-      } else {
+        if ((!PermissionHelper.hasPermission(this, Manifest.permission.READ_MEDIA_IMAGES) ||
+                !PermissionHelper.hasPermission(this, Manifest.permission.READ_MEDIA_AUDIO) ||
+                !PermissionHelper.hasPermission(this, Manifest.permission.READ_MEDIA_VIDEO) ||
+                !PermissionHelper.hasPermission(this, Manifest.permission.CAMERA)) &&
+                (( !PermissionHelper.hasPermission(this, Manifest.permission.READ_EXTERNAL_STORAGE) ||
+                        !PermissionHelper.hasPermission(this, Manifest.permission.WRITE_EXTERNAL_STORAGE)))
+        ){
+            PermissionHelper.requestPermissions(this, req.requestCode, permissions);
+        } else {
           try {
               Intent intent = new Intent(android.provider.MediaStore.Audio.Media.RECORD_SOUND_ACTION);
 
@@ -279,20 +303,14 @@ public class Capture extends CordovaPlugin {
      * Sets up an intent to capture images.  Result handled by onActivityResult()
      */
     private void captureImage(Request req) {
-        boolean needExternalStoragePermission =
-            !PermissionHelper.hasPermission(this, Manifest.permission.WRITE_EXTERNAL_STORAGE);
-
-        boolean needCameraPermission = cameraPermissionInManifest &&
-            !PermissionHelper.hasPermission(this, Manifest.permission.CAMERA);
-
-        if (needExternalStoragePermission || needCameraPermission) {
-            if (needExternalStoragePermission && needCameraPermission) {
-                PermissionHelper.requestPermissions(this, req.requestCode, new String[]{Manifest.permission.WRITE_EXTERNAL_STORAGE, Manifest.permission.CAMERA});
-            } else if (needExternalStoragePermission) {
-                PermissionHelper.requestPermission(this, req.requestCode, Manifest.permission.WRITE_EXTERNAL_STORAGE);
-            } else {
-                PermissionHelper.requestPermission(this, req.requestCode, Manifest.permission.CAMERA);
-            }
+        if ((!PermissionHelper.hasPermission(this, Manifest.permission.READ_MEDIA_IMAGES) ||
+                !PermissionHelper.hasPermission(this, Manifest.permission.READ_MEDIA_AUDIO) ||
+                !PermissionHelper.hasPermission(this, Manifest.permission.READ_MEDIA_VIDEO) ||
+                !PermissionHelper.hasPermission(this, Manifest.permission.CAMERA)) &&
+                (( !PermissionHelper.hasPermission(this, Manifest.permission.READ_EXTERNAL_STORAGE) ||
+                        !PermissionHelper.hasPermission(this, Manifest.permission.WRITE_EXTERNAL_STORAGE)))
+        ){
+            PermissionHelper.requestPermissions(this, req.requestCode, permissions);
         } else {
             // Save the number of images currently on disk for later
             this.numPics = queryImgDB(whichContentStore()).getCount();
@@ -324,8 +342,14 @@ public class Capture extends CordovaPlugin {
      * Sets up an intent to capture video.  Result handled by onActivityResult()
      */
     private void captureVideo(Request req) {
-        if(cameraPermissionInManifest && !PermissionHelper.hasPermission(this, Manifest.permission.CAMERA)) {
-            PermissionHelper.requestPermission(this, req.requestCode, Manifest.permission.CAMERA);
+        if ((!PermissionHelper.hasPermission(this, Manifest.permission.READ_MEDIA_IMAGES) ||
+                !PermissionHelper.hasPermission(this, Manifest.permission.READ_MEDIA_AUDIO) ||
+                !PermissionHelper.hasPermission(this, Manifest.permission.READ_MEDIA_VIDEO) ||
+                !PermissionHelper.hasPermission(this, Manifest.permission.CAMERA)) &&
+                (( !PermissionHelper.hasPermission(this, Manifest.permission.READ_EXTERNAL_STORAGE) ||
+                        !PermissionHelper.hasPermission(this, Manifest.permission.WRITE_EXTERNAL_STORAGE)))
+        ){
+            PermissionHelper.requestPermissions(this, req.requestCode, permissions);
         } else {
             Intent intent = new Intent(android.provider.MediaStore.ACTION_VIDEO_CAPTURE);
             String timeStamp = new SimpleDateFormat("yyyyMMddHHmmssSSS").format(new Date());
@@ -638,12 +662,13 @@ public class Capture extends CordovaPlugin {
 
         if (req != null) {
             boolean success = true;
-            for(int r:grantResults) {
-                if (r == PackageManager.PERMISSION_DENIED) {
-                    success = false;
-                    break;
-                }
-            }
+// Fix SDK 33 Permission if error on older SDK pls add conditional
+//            for(int r:grantResults) {
+//                if (r == PackageManager.PERMISSION_DENIED) {
+//                    success = false;
+//                    break;
+//                }
+//            }
 
             if (success) {
                 executeRequest(req);
