@@ -662,7 +662,7 @@ public class Capture extends CordovaPlugin {
 
         if (req != null) {
             boolean success = true;
-// Fix Permissions SDK 33 if there is a problem on an older SDK pls add a conditional here
+// Fix SDK 33 Permission if error on older SDK pls add conditional
 //            for(int r:grantResults) {
 //                if (r == PackageManager.PERMISSION_DENIED) {
 //                    success = false;
